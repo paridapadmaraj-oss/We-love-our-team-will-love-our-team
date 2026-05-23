@@ -1,0 +1,9 @@
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+Options -Indexes
+ServerSignature Off
+<FilesMatch "\.(sql|md|log)$">
+Deny from all
+</FilesMatch>
